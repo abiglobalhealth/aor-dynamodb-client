@@ -22,12 +22,13 @@ const awsConfig = { //optional
 	region: 'us-east-1'
 };
 
-const tableConfig = {
-	TableName:
+const config = {
+	tableName: 'some-table-name',
+	key: 'id', // optional
 }
 
 const App = () => (
-	<Admin restClient={restClient(tableConfig, awsConfig)} >
+	<Admin restClient={restClient(config, awsConfig)} >
 		<Resource name="posts" list={PostList} />
 	</Admin>
 );
