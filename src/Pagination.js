@@ -59,13 +59,13 @@ export class Pagination extends Component {
         return width === 1 ? (
             <Toolbar>
                 <ToolbarGroup style={styles.mobileToolbar}>
-                    {page > 1 && (
-                        <IconButton onClick={this.prevPage}>
-                            <ChevronLeft
-                                color={muiTheme.palette.primary1Color}
-                            />
-                        </IconButton>
-                    )}
+                    <IconButton 
+                        disabled={page <=1} 
+                        onClick={this.prevPage}>
+                        <ChevronLeft
+                            color={muiTheme.palette.primary1Color}
+                        />
+                    </IconButton>
                     <span style={styles.pageInfo}>
                         {translate('aor.navigation.page_range_info', {
                             offsetBegin,
@@ -75,13 +75,11 @@ export class Pagination extends Component {
                                 : total,
                         })}
                     </span>
-                    {page !== nbPages && (
-                        <IconButton onClick={this.nextPage}>
-                            <ChevronRight
-                                color={muiTheme.palette.primary1Color}
-                            />
-                        </IconButton>
-                    )}
+                    <IconButton disabled={page >= nbPages} onClick={this.nextPage}>
+                        <ChevronRight
+                            color={muiTheme.palette.primary1Color}
+                        />
+                    </IconButton>
                 </ToolbarGroup>
             </Toolbar>
         ) : (
@@ -99,29 +97,27 @@ export class Pagination extends Component {
                 </ToolbarGroup>
                 {nbPages > 1 && (
                     <ToolbarGroup>
-                        {page > 1 && (
-                            <FlatButton
-                                className="previous-page"
-                                primary
-                                key="prev"
-                                label={translate('aor.navigation.prev')}
-                                icon={<ChevronLeft />}
-                                onClick={this.prevPage}
-                                style={styles.button}
-                            />
-                        )}
-                        {page !== nbPages && (
-                            <FlatButton
-                                className="next-page"
-                                primary
-                                key="next"
-                                label={translate('aor.navigation.next')}
-                                icon={<ChevronRight />}
-                                labelPosition="before"
-                                onClick={this.nextPage}
-                                style={styles.button}
-                            />
-                        )}
+                        <FlatButton
+                            className="previous-page"
+                            primary
+                            key="prev"
+                            disabled={page <= 1}
+                            label={translate('aor.navigation.prev')}
+                            icon={<ChevronLeft />}
+                            onClick={this.prevPage}
+                            style={styles.button}
+                        />
+                        <FlatButton
+                            className="next-page"
+                            primary
+                            disabled={page >= nbPages}
+                            key="next"
+                            label={translate('aor.navigation.next')}
+                            icon={<ChevronRight />}
+                            labelPosition="before"
+                            onClick={this.nextPage}
+                            style={styles.button}
+                        />
                     </ToolbarGroup>
                 )}
             </Toolbar>

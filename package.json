@@ -1,6 +1,6 @@
 {
   "name": "aor-dynamodb-client",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "An [admin-on-rest](https://github.com/marmelab/admin-on-rest) client for [DynamoDb](https://aws.amazon.com/dynamodb/).",
   "main": "src/index.js",
   "scripts": {

@@ -9,49 +9,28 @@ import {
 } from 'admin-on-rest/lib/rest/types'
 
 import AWS from 'aws-sdk'
-
+import dynamoHelper from './dynamoHelper'
 
 export default ({ tableName, key='id' }, options = {}) => {
   let ids = []
   let dynamodb
 
-  const recursiveBatchGet = (keys, results=[]) => {
-    return dynamodb.batchGet({
-      RequestItems: {
-        [ tableName ]: {
-          Keys: keys.slice(0, 100)
-        }
-      }
-    }).promise()
-    .then(({ Responses, UnprocessedKeys }) => {
-      if (Responses.length == keys.length) 
-        return results.concat(Responses)
-
-      const nextKeys = UnprocessedKeys.Keys.concat(keys.slice(100))
-      return recursiveBatchGet(nextKeys, results.concat(Responses))
-    })         
-  }
-
-  const getOne = key => {
-    return dynamodb.get({
-      TableName: tableName,
-      Key: key
-    }).promise()
-  }
-
   return (type, resource, params) => {
-    dynamodb = dynamodb || new AWS.DynamoDB.DocumentClient(options);
+    dynamodb = dynamodb || dynamoHelper(new AWS.DynamoDB.DocumentClient(options));
 
     switch (type) {
 
       case GET_MANY:
-        return recursiveBatchGet(params.ids.map(id => ({ [ key ]: id })))
+        let keys = params.ids.map(id => ({ [ key ]: id }))
+        return dynamodb.batchGet({ tableName, keys })
           .then(data => ({ data }))
  
 
       case GET_ONE:
-        return getOne({ [ key ]: params.id })
-          .then(({ Item }) => ({ data: Item }))
+        return dynamodb.getOne({ tableName, key: {
+            [ key ]: params.id,
+          }})
+          .then(data => ({ data }))
         
       case GET_LIST:
         const { pagination } = params
@@ -59,41 +38,21 @@ export default ({ tableName, key='id' }, options = {}) => {
 
         ids = ids.slice(0, perPage * page - perPage)
 
-        const dynamodb = new AWS.DynamoDB.DocumentClient(options);
         const limit = perPage * page - ids.length
+        const startKey = ids.length > 0 && { 
+          [ key ]: ids[ids.length-1],
+        }
 
-        const recursiveScan = (startKey, results=[]) => {
-          return dynamodb.scan({
-            TableName: tableName,
-            Limit: limit - results.length,
-            ExclusiveStartKey: startKey
-          }).promise()
-          .then(({ Items=[], LastEvaluatedKey }) => {
-            let data = results.concat(Items.map(i => ({ ...i, id: i[key] })))
+        return dynamodb.scan({ tableName, limit, startKey })
+          .then(({ results, hasMore }) => {
+            let data = results.map(i => ({ ...i, id: i[key] }))
+            ids = ids.concat(data.map(i => i.id))
 
-            if (LastEvaluatedKey && data.length < limit)
-              return recursiveScan(LastEvaluatedKey, results)
-
-            return { 
-              data, 
-              hasMore: !!LastEvaluatedKey,
+            return {
+              data: data.slice(perPage * -1),
+              total: ids.length + (hasMore ? 1 : 0),
             }
-          
           })
-        } 
-        
-        const lastItem = ids[ids.length-1]
-        return recursiveScan(lastItem && { 
-          [ key ]: lastItem,
-        })
-        .then(({ data, hasMore }) => {
-          ids = ids.concat(data.map(i => i.id))
-
-          return {
-            data,
-            total: ids.length + (hasMore ? 1 : 0),
-          }
-        })
 
     }
   }
