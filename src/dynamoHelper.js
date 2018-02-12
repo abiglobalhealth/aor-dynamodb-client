@@ -1,7 +1,7 @@
 const timeout = ms => new Promise(res => setTimeout(res, ms))
 
-export default docClient => {
-	async function scan({ tableName, limit, startKey }) {
+export default docClient => tableName => {
+	async function scan({ limit, startKey, options={} }) {
 		let results = []
 		let hasMore = true
 
@@ -10,6 +10,7 @@ export default docClient => {
 				TableName: tableName,
 				Limit: limit,
 				ExclusiveStartKey: startKey || undefined,
+				...options,
 			}).promise()
 
 			results = results.concat(Items)
@@ -23,7 +24,7 @@ export default docClient => {
 		}
 	}
 
-	async function batchGet({ tableName, keys }) {
+	async function batchGet({ keys, options={} }) {
 		let results = []
 		let i = 0
 		while (keys.length > 0 ) {
@@ -31,7 +32,8 @@ export default docClient => {
 	    let { Responses, UnprocessedKeys } = await docClient.batchGet({
 	      RequestItems: {
 	        [ tableName ]: { Keys }
-	      }
+	      },
+	      ...options,
 	    }).promise()
 
 	   	results = results.concat(Responses)
@@ -46,13 +48,31 @@ export default docClient => {
 		return results
 	}
 
-
-  const getOne = ({ tableName, key }) => {
+  const getOne = ({ key, options={} }) => {
     return docClient.get({
       TableName: tableName,
-      Key: key
+      Key: key,
+      ...options,
     }).promise()
     .then(({ Item }) => Item)
+  }
+
+  const deleteItem = ({ key, options={} }) => {
+    return docClient.delete({
+      TableName: tableName,
+      Key: key,
+      ...options,
+    }).promise()
+    .then(({ Attributes }) => Attributes)
+  }
+
+  const putItem = ({ attributes, options={} }) => {
+    return docClient.put({
+      TableName: tableName,
+     	Item: attributes,
+     	...options,
+    }).promise()
+    .then(() => attributes)
   }
 
 
@@ -60,5 +80,7 @@ export default docClient => {
 		scan,
 		batchGet,
 		getOne,
+		putItem,
+		deleteItem,
 	}
 }

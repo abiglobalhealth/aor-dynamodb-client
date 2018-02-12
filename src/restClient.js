@@ -16,21 +16,43 @@ export default ({ tableName, key='id' }, options = {}) => {
   let dynamodb
 
   return (type, resource, params) => {
-    dynamodb = dynamodb || dynamoHelper(new AWS.DynamoDB.DocumentClient(options));
+    dynamodb = dynamodb || dynamoHelper(new AWS.DynamoDB.DocumentClient(options))(tableName);
 
     switch (type) {
 
-      case GET_MANY:
-        let keys = params.ids.map(id => ({ [ key ]: id }))
-        return dynamodb.batchGet({ tableName, keys })
-          .then(data => ({ data }))
- 
-
       case GET_ONE:
-        return dynamodb.getOne({ tableName, key: {
+        return dynamodb.getOne({ key: {
             [ key ]: params.id,
           }})
           .then(data => ({ data }))
+
+      case GET_MANY:
+        let keys = params.ids.map(id => ({ [ key ]: id }))
+        return dynamodb.batchGet({ keys })
+          .then(data => ({ data }))
+
+      case CREATE: 
+        return dynamodb.putItem({
+          attributes: params.data,
+          options: {
+            ConditionExpression: `attribute_not_exists(${key})`,
+          },
+        })
+
+      case DELETE:
+        return dynamodb.deleteItem({ key: {
+            [ key ]: params.id,
+          }})
+          .then(data => ({ data }))
+
+      case UPDATE:
+        return dynamodb.putItem({
+            attributes: {
+              ...params.data,
+              [ key ]: params.id,
+            },
+          })
+          .then(data => ({ data }))        
         
       case GET_LIST:
         const { pagination } = params
@@ -43,7 +65,7 @@ export default ({ tableName, key='id' }, options = {}) => {
           [ key ]: ids[ids.length-1],
         }
 
-        return dynamodb.scan({ tableName, limit, startKey })
+        return dynamodb.scan({ limit, startKey })
           .then(({ results, hasMore }) => {
             let data = results.map(i => ({ ...i, id: i[key] }))
             ids = ids.concat(data.map(i => i.id))
