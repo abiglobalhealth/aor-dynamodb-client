@@ -11,8 +11,9 @@ import {
 import AWS from 'aws-sdk'
 import dynamoHelper from './dynamoHelper'
 
-export default ({ tableName, key='id' }, options = {}) => {
-  let ids = []
+const defaultKeyMapper = ({ id }) => ({ id })
+export default ({ tableName, keyMapper=defaultKeyMapper }, options = {}) => {
+  let cache = []
   let dynamodb
 
   return (type, resource, params) => {
@@ -21,13 +22,11 @@ export default ({ tableName, key='id' }, options = {}) => {
     switch (type) {
 
       case GET_ONE:
-        return dynamodb.getOne({ key: {
-            [ key ]: params.id,
-          }})
+        return dynamodb.getOne({ key: keyMapper(params)})
           .then(data => ({ data }))
 
       case GET_MANY:
-        let keys = params.ids.map(id => ({ [ key ]: id }))
+        let keys = params.ids.map(keyMapper)
         return dynamodb.batchGet({ keys })
           .then(data => ({ data }))
 
@@ -35,44 +34,40 @@ export default ({ tableName, key='id' }, options = {}) => {
         return dynamodb.putItem({
           attributes: params.data,
           options: {
-            ConditionExpression: `attribute_not_exists(${key})`,
+            ConditionExpression: `attribute_not_exists(id)`,
           },
         })
 
       case DELETE:
-        return dynamodb.deleteItem({ key: {
-            [ key ]: params.id,
-          }})
+        return dynamodb.deleteItem({ key: keyMapper(params) })
           .then(data => ({ data }))
 
       case UPDATE:
         return dynamodb.putItem({
             attributes: {
               ...params.data,
-              [ key ]: params.id,
+              ...keyMapper(params),
             },
           })
           .then(data => ({ data }))        
         
       case GET_LIST:
-        const { pagination } = params
+        const { pagination, filter } = params
         const { page, perPage } = pagination
 
-        ids = ids.slice(0, perPage * page - perPage)
+        cache = cache.slice(0, perPage * page - perPage)
 
-        const limit = perPage * page - ids.length
-        const startKey = ids.length > 0 && { 
-          [ key ]: ids[ids.length-1],
-        }
-
+        const limit = perPage * page - cache.length
+        const startKey = cache.length > 0 && keyMapper(cache[cache.length-1]) 
+        
+        
         return dynamodb.scan({ limit, startKey })
           .then(({ results, hasMore }) => {
-            let data = results.map(i => ({ ...i, id: i[key] }))
-            ids = ids.concat(data.map(i => i.id))
+            cache = cache.concat(results)
 
             return {
-              data: data.slice(perPage * -1),
-              total: ids.length + (hasMore ? 1 : 0),
+              data: results.slice(perPage * -1),
+              total: cache.length + (hasMore ? 1 : 0),
             }
           })
 
