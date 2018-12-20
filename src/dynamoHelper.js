@@ -1,86 +1,93 @@
 const timeout = ms => new Promise(res => setTimeout(res, ms))
 
 export default docClient => tableName => {
-	async function scan({ limit, startKey, options={} }) {
-		let results = []
-		let hasMore = true
+    async function scan({ limit, startKey, options = {} }) {
+        let results = []
+        let hasMore = true
 
-		while (hasMore && results.length < limit || !limit) {
-			let { Items=[], LastEvaluatedKey } = await docClient.scan({
-				TableName: tableName,
-				Limit: limit,
-				ExclusiveStartKey: startKey || undefined,
-				...options,
-			}).promise()
+        while (hasMore && results.length < limit || !limit) {
+            let { Items = [], LastEvaluatedKey } = await docClient.scan({
+                TableName: tableName,
+                Limit: limit,
+                ExclusiveStartKey: startKey || undefined,
+                ...options,
+            }).promise()
 
-			results = results.concat(Items)
-			startKey = LastEvaluatedKey
-			hasMore = !!LastEvaluatedKey
-		}
+            results = results.concat(Items)
+            startKey = LastEvaluatedKey
+            hasMore = !!LastEvaluatedKey
+        }
 
-		return {
-			results,
-			hasMore,
-		}
-	}
+        return {
+            results,
+            hasMore,
+        }
+    }
 
-	async function batchGet({ keys, options={} }) {
-		let results = []
-		let i = 0
-		while (keys.length > 0 ) {
-			let Keys = keys.splice(0, 100)
-	    let { Responses, UnprocessedKeys } = await docClient.batchGet({
-	      RequestItems: {
-	        [ tableName ]: { Keys }
-	      },
-	      ...options,
-	    }).promise()
+    async function query({ options = {} }) {
+        return await docClient.query({
+            TableName: tableName,
+            ...options,
+        }).promise()
+    }
 
-	   	results = results.concat(Responses)
-	   	
-	   	let remaining = UnprocessedKeys.Keys
-	    if (remaining.length > 0) {
-	    	await timeout(Math.random() * remaining.length)
-	    	keys = remaining.concat(keys)
-	    }
-		}
+    async function batchGet({ keys, options = {} }) {
+        let results = []
+        let i = 0
+        while (keys.length > 0) {
+            let Keys = keys.splice(0, 100)
+            let { Responses, UnprocessedKeys } = await docClient.batchGet({
+                RequestItems: {
+                    [tableName]: { Keys }
+                },
+                ...options,
+            }).promise()
 
-		return results
-	}
+            results = results.concat(Responses)
 
-  const getOne = ({ key, options={} }) => {
-    return docClient.get({
-      TableName: tableName,
-      Key: key,
-      ...options,
-    }).promise()
-    .then(({ Item }) => Item)
-  }
+            let remaining = UnprocessedKeys.Keys
+            if (remaining.length > 0) {
+                await timeout(Math.random() * remaining.length)
+                keys = remaining.concat(keys)
+            }
+        }
 
-  const deleteItem = ({ key, options={} }) => {
-    return docClient.delete({
-      TableName: tableName,
-      Key: key,
-      ...options,
-    }).promise()
-    .then(({ Attributes }) => Attributes)
-  }
+        return results
+    }
 
-  const putItem = ({ attributes, options={} }) => {
-    return docClient.put({
-      TableName: tableName,
-     	Item: attributes,
-     	...options,
-    }).promise()
-    .then(() => attributes)
-  }
+    const getOne = ({ key, options = {} }) => {
+        return docClient.get({
+            TableName: tableName,
+            Key: key,
+            ...options,
+        }).promise()
+            .then(({ Item }) => Item)
+    }
 
+    const deleteItem = ({ key, options = {} }) => {
+        return docClient.delete({
+            TableName: tableName,
+            Key: key,
+            ...options,
+        }).promise()
+            .then((Response) => Response)
+    }
 
-	return {
-		scan,
-		batchGet,
-		getOne,
-		putItem,
-		deleteItem,
-	}
+    const putItem = ({ attributes, options = {} }) => {
+        return docClient.put({
+            TableName: tableName,
+            Item: attributes,
+            ...options,
+        }).promise()
+            .then(() => attributes)
+    }
+
+    return {
+        scan,
+        query,
+        batchGet,
+        getOne,
+        putItem,
+        deleteItem,
+    }
 }
